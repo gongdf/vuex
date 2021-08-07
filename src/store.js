@@ -50,7 +50,7 @@ export class Store {
     // strict mode
     this.strict = strict
 
-    const state = this._modules.root.state
+    const state = this._modules.root.state // 合并各个模块后的state
 
     // init root module.
     // this also recursively registers all sub-modules
@@ -89,6 +89,7 @@ export class Store {
     } = unifyObjectStyle(_type, _payload, _options)
 
     const mutation = { type, payload }
+    // 获取对应的mutation函数
     const entry = this._mutations[type]
     if (!entry) {
       if (__DEV__) {
@@ -96,12 +97,14 @@ export class Store {
       }
       return
     }
+    // 执行mutation函数
     this._withCommit(() => {
       entry.forEach(function commitIterator (handler) {
         handler(payload)
       })
     })
 
+    // 执行subscribe监听函数
     this._subscribers
       .slice() // shallow copy to prevent iterator invalidation if subscriber synchronously calls unsubscribe
       .forEach(sub => sub(mutation, this.state))
@@ -125,6 +128,7 @@ export class Store {
     } = unifyObjectStyle(_type, _payload)
 
     const action = { type, payload }
+    // 获取对应的action函数
     const entry = this._actions[type]
     if (!entry) {
       if (__DEV__) {
@@ -134,6 +138,7 @@ export class Store {
     }
 
     try {
+      // 执行subscribeAction监听的before函数
       this._actionSubscribers
         .slice() // shallow copy to prevent iterator invalidation if subscriber synchronously calls unsubscribe
         .filter(sub => sub.before)
@@ -152,6 +157,7 @@ export class Store {
     return new Promise((resolve, reject) => {
       result.then(res => {
         try {
+          // 执行subscribeAction监听的after函数
           this._actionSubscribers
             .filter(sub => sub.after)
             .forEach(sub => sub.after(action, this.state))
@@ -191,6 +197,8 @@ export class Store {
     if (__DEV__) {
       assert(typeof getter === 'function', `store.watch only accepts a function.`)
     }
+    // 没有使用this._vm.$watch
+    // vuex统一使用this._watcherVm = new Vue()来管理store的watcher
     return this._watcherVM.$watch(() => getter(this.state, this.getters), cb, options)
   }
 
@@ -281,6 +289,7 @@ function resetStore (store, hot) {
 function resetStoreVM (store, state, hot) {
   const oldVm = store._vm
 
+  // getters用vm的computed实现
   // bind store public getters
   store.getters = {}
   // reset local getters cache
@@ -292,8 +301,9 @@ function resetStoreVM (store, state, hot) {
     // direct inline function use will lead to closure preserving oldVm.
     // using partial to return function with only arguments preserved in closure environment.
     computed[key] = partial(fn, store)
+    // 访问代理，实际访问store._vm[key] === _vm上computed的key
     Object.defineProperty(store.getters, key, {
-      get: () => store._vm[key],
+      get: () => store._vm[key], // 属性读取时才会运行
       enumerable: true // for local getters
     })
   })
@@ -303,15 +313,16 @@ function resetStoreVM (store, state, hot) {
   // some funky global mixins
   const silent = Vue.config.silent
   Vue.config.silent = true
+  // 利用vue将state数据转为响应式数据
   store._vm = new Vue({
     data: {
       $$state: state
     },
-    computed
+    computed // 对应的getters
   })
   Vue.config.silent = silent
 
-  // enable strict mode for new vm
+  // 严格模式下$watch state的每一项数据，直接修改抛出错误
   if (store.strict) {
     enableStrictMode(store)
   }

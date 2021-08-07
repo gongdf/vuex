@@ -27,6 +27,7 @@ export default function (Vue) {
         ? options.store()
         : options.store
     } else if (options.parent && options.parent.$store) {
+      // 一层一层依次传递
       this.$store = options.parent.$store
     }
   }

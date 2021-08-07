@@ -26,6 +26,7 @@ export function deepCopy (obj, cache = []) {
   }
 
   // if obj is hit, it is in circular structure
+  // 防止循环引用问题
   const hit = find(cache, c => c.original === obj)
   if (hit) {
     return hit.copy
